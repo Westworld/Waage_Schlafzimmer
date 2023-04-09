@@ -17,14 +17,14 @@
 float KatzeGewichtStart = 8.0;
 float KatzeGewichtEnde = 8.9;
 
-#define UDPDEBUG 1
+//#define UDPDEBUG 1
 #ifdef UDPDEBUG
 WiFiUDP udp;
 const char * udpAddress = "192.168.0.34";
 const int udpPort = 19814;
 #endif
 
-const char* MQTT_BROKER = "192.168.0.57";
+const char* MQTT_BROKER = "192.168.0.46";
  
 WiFiClient espClient;
 PubSubClient client(espClient);
