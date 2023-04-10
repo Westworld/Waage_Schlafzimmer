@@ -8,3 +8,4 @@ void SendeString(String url);
 void SendeLicht(int licht);
 void SendeStatus(float Gewicht, int warum, float Gelesen);
 void WIFI_Connect();
+float BerechneDurchschnitt(float neu);

@@ -17,7 +17,7 @@
 float KatzeGewichtStart = 8.0;
 float KatzeGewichtEnde = 8.9;
 
-//#define UDPDEBUG 1
+#define UDPDEBUG 1
 #ifdef UDPDEBUG
 WiFiUDP udp;
 const char * udpAddress = "192.168.0.34";
@@ -53,6 +53,9 @@ float Gewicht=0;
 float AltGewicht=0;
 int Messungen=0;
 int TaraCounter = 0;
+
+float GewichtMittel[10];
+int GewichtAnzahl=0;
 
 int LichtBad=0;
 int LichtDach=0;
@@ -246,9 +249,8 @@ void loop() {
   }
 
   float Gelesen=0;
-  float Durchschnitt=0;
 
- if (((counter == 1000) & (ledjob <= 3)) | (counter == 1999)) {
+ if ((counter == 1000)  | (counter == 1999)) {
   // alle 1 sec
     Gelesen = scale.get_units(10);
     if ((Gelesen <= (AltGewicht + 0.1)) && (Gelesen >= (AltGewicht - 0.1)) ) {  // gleicher Wert erneut gelesen     
@@ -320,32 +322,20 @@ void WIFI_Connect()
 // #############################################################
 
 void SendeStatus(float Gewicht, int warum, float Gelesen) {
-  UDBDebug("SendeStatus "+String(Gewicht));
-     Serial.print("SendeStatus ");
-     Serial.println(Gewicht);
+  UDBDebug("SendeStatus Timmi "+String(Gewicht));
+  //   Serial.print("SendeStatus ");
+  //   Serial.println(Gewicht);
      
-/*
-  WiFiClient client;
-  if (!client.connect(host, httpPort)) {
-      //rdebugEln("Client Timeout");    
-    return;
-  }
-
-
-  String job = Katze;
-  String url = "/4DAction/Strom?Job="+job+"&Gewicht=";
-  url += Gewicht;
-  url += "&Grund=";
-  url += warum;
-  url += "&Gelesen=";
-  url += Gelesen;
-
-  SendeString(url);  */
-
   float sende = roundf(Gewicht * 100) / 100;
   MQTT_Send("display/Gewicht", sende);
-  if ((sende > KatzeGewichtStart) && (sende < KatzeGewichtEnde))
+  
+  if ((sende > KatzeGewichtStart) && (sende < KatzeGewichtEnde)) {
+    UDBDebug("Timmi gewogen: "+String(sende));
+    sende = BerechneDurchschnitt(Gewicht);
+    sende = roundf(sende * 100) / 100;
+    UDBDebug("Timmi Durchschnitt: "+String(sende));
     MQTT_Send("HomeServer/Tiere/Timmi", sende);
+  }  
 }
 
 void SendeLicht(int licht) {
@@ -355,11 +345,6 @@ void SendeLicht(int licht) {
    leds[0] = CRGB(0, 255, 0);  // black
    FastLED.show();
    delay(1000);
-   
-  //String url = "/4DAction/Strom?Job=Licht&Was=";
-  //url +=licht;
-  // url +="&test=0";
-  //SendeString(url);
 
   UDBDebug("Licht: "+String(licht));
 
@@ -390,45 +375,24 @@ void SendeLicht(int licht) {
    FastLED.show();
 }
 
-void SendeString(String url) {
-/*
-  WiFiClient client;
-  if (!client.connect(host, httpPort)) {   
-      return;
+float BerechneDurchschnitt(float neu) {
+  if (GewichtAnzahl>9) {
+    for (int i = 0; i<9; i++) {
+      GewichtMittel[i] = GewichtMittel[i+1];
     }
+    GewichtAnzahl--;
+  }
 
-        Serial.print("SendeString ");
-        Serial.println(url);
-        
-   // This will send the request to the server
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: " + host + "\r\n" + 
-               "Connection: close\r\n\r\n");
-  unsigned long timeout = millis();
-  while (client.available() == 0) {
-    if (millis() - timeout > 1000) {   
-      client.stop();
-      return;
-    }
+  GewichtMittel[GewichtAnzahl++] = neu;
+
+  float mittel = 0;
+  for (int i = 0; i<10; i++) {
+      mittel += GewichtMittel[i];
   }
-  
-  // Read all the lines of the reply from server and print them to Serial
-  while(client.available()){
-    String line = client.readStringUntil('\r');
-    //debugV("web answer: %s", line.c_str());
-  }
- */ 
+  return (mittel / GewichtAnzahl);  
 }
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
-    /*String msg;
-    for (byte i = 0; i < length; i++) {
-        char tmp = char(payload[i]);
-        msg += tmp;
-    }
-    Serial.println(msg);
-    debugV("MQTT message: %s", msg.c_str());
-    */
 
    if(length==1) {
       String stopic = String(topic);
