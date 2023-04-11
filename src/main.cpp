@@ -322,12 +322,13 @@ void WIFI_Connect()
 // #############################################################
 
 void SendeStatus(float Gewicht, int warum, float Gelesen) {
-  UDBDebug("SendeStatus Timmi "+String(Gewicht));
-  //   Serial.print("SendeStatus ");
-  //   Serial.println(Gewicht);
-     
-  float sende = roundf(Gewicht * 100) / 100;
-  MQTT_Send("display/Gewicht", sende);
+
+  float sende = roundf(Gewicht * 89) / 100;   // Waage * 0.89 zur Korrektur
+
+  if (Gewicht > 3) {
+    UDBDebug("SendeStatus Timmi "+String(Gewicht));
+    MQTT_Send("display/Gewicht", sende);
+  }
   
   if ((sende > KatzeGewichtStart) && (sende < KatzeGewichtEnde)) {
     UDBDebug("Timmi gewogen: "+String(sende));
@@ -421,7 +422,8 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
 
     if(length==1) {
       ledjob = payload[0]-48;  // job as ascii
-      UDBDebug("Lichtjob: "+String(ledjob));
+      if (ledjob != 0)
+        UDBDebug("Lichtjob: "+String(ledjob));
       //debugV("MQTT message new led job = %d", ledjob);
       counter=2000, ledcounter=0; // reset
       leds[0] = CRGB::Black;
