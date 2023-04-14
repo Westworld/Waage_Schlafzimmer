@@ -326,15 +326,15 @@ void SendeStatus(float Gewicht, int warum, float Gelesen) {
   float sende = roundf(Gewicht * 89) / 100;   // Waage * 0.89 zur Korrektur
 
   if (Gewicht > 3) {
-    UDBDebug("SendeStatus Timmi "+String(Gewicht));
+    //UDBDebug("SendeStatus Timmi "+String(Gewicht));
     MQTT_Send("display/Gewicht", sende);
   }
   
   if ((sende > KatzeGewichtStart) && (sende < KatzeGewichtEnde)) {
-    UDBDebug("Timmi gewogen: "+String(sende));
-    sende = BerechneDurchschnitt(Gewicht);
+    //UDBDebug("Timmi gewogen: "+String(sende));
+    sende = BerechneDurchschnitt(sende);
     sende = roundf(sende * 100) / 100;
-    UDBDebug("Timmi Durchschnitt: "+String(sende));
+    //UDBDebug("Timmi Durchschnitt: "+String(sende));
     MQTT_Send("HomeServer/Tiere/Timmi", sende);
   }  
 }
@@ -387,9 +387,10 @@ float BerechneDurchschnitt(float neu) {
   GewichtMittel[GewichtAnzahl++] = neu;
 
   float mittel = 0;
-  for (int i = 0; i<10; i++) {
+  for (int i = 0; i<GewichtAnzahl; i++) {
       mittel += GewichtMittel[i];
   }
+  UDBDebug("total: "+String(mittel)+" Anzahl: "+String(GewichtAnzahl));
   return (mittel / GewichtAnzahl);  
 }
 
