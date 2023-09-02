@@ -20,7 +20,7 @@ float KatzeGewichtEnde = 8.9;
 #define UDPDEBUG 1
 #ifdef UDPDEBUG
 WiFiUDP udp;
-const char * udpAddress = "192.168.0.34";
+const char * udpAddress = "192.168.0.95";
 const int udpPort = 19814;
 #endif
 
@@ -28,9 +28,6 @@ const char* MQTT_BROKER = "192.168.0.46";
  
 WiFiClient espClient;
 PubSubClient client(espClient);
-
-const char* host = "192.168.0.59"; // "192.168.0.34";
-const int httpPort = 80;
 
 uint32_t mLastTime = 0;
 uint32_t mTimeSeconds = 0;
@@ -127,6 +124,7 @@ button4 = new DebounceEvent(D7, BUTTON_PUSHBUTTON | BUTTON_DEFAULT_HIGH | BUTTON
   scale.set_scale(kalibrierung); // (223.F);                      // this value is obtained by calibrating the scale with known weights; see the README for details
   scale.tare(20);                // reset the scale to 0
   Serial.println("begin");
+  UDBDebug("Timmit start");
   delay(500);
 }
 
@@ -157,6 +155,7 @@ void loop() {
             client.subscribe("hm/status/Gang/STATE");
             delay(100);
             Serial.println("reconnect mqtt");
+            UDBDebug("reconnect mqtt");
         }
     }
     client.loop();
@@ -250,7 +249,7 @@ void loop() {
 
   float Gelesen=0;
 
- if ((counter == 1000)  | (counter == 1999)) {
+ if ((counter >= 10000) ) {
   // alle 1 sec
     Gelesen = scale.get_units(10);
     if ((Gelesen <= (AltGewicht + 0.1)) && (Gelesen >= (AltGewicht - 0.1)) ) {  // gleicher Wert erneut gelesen     
@@ -326,15 +325,15 @@ void SendeStatus(float Gewicht, int warum, float Gelesen) {
   float sende = roundf(Gewicht * 89) / 100;   // Waage * 0.89 zur Korrektur
 
   if (Gewicht > 3) {
-    //UDBDebug("SendeStatus Timmi "+String(Gewicht));
+    UDBDebug("SendeStatus Timmi "+String(Gewicht));
     MQTT_Send("display/Gewicht", sende);
   }
   
   if ((sende > KatzeGewichtStart) && (sende < KatzeGewichtEnde)) {
-    //UDBDebug("Timmi gewogen: "+String(sende));
+    UDBDebug("Timmi gewogen: "+String(sende));
     sende = BerechneDurchschnitt(sende);
     sende = roundf(sende * 100) / 100;
-    //UDBDebug("Timmi Durchschnitt: "+String(sende));
+    UDBDebug("Timmi Durchschnitt: "+String(sende));
     MQTT_Send("HomeServer/Tiere/Timmi", sende);
   }  
 }
@@ -402,21 +401,21 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
         short state=0;
         state = payload[0]-48; 
         LichtBad = state;
-        UDBDebug(stopic+" - "+String(state));
+        //UDBDebug(stopic+" - "+String(state));
         return;
       }
       if (stopic == "hm/status/Dach/STATE") {
         short state=0;
         state = payload[0]-48; 
         LichtDach = state;
-        UDBDebug(stopic+" - "+String(state));
+        //UDBDebug(stopic+" - "+String(state));
         return;
       }
       if (stopic == "hm/status/Gang/STATE") {
         short state=0;
         state = payload[0]-48; 
         LichtGang = state;
-        UDBDebug(stopic+" - "+String(state));
+        //UDBDebug(stopic+" - "+String(state));
         return;
       }
    }
