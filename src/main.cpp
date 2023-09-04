@@ -14,8 +14,8 @@
 
 #define Katze "Timmi"
 
-float KatzeGewichtStart = 8.0;
-float KatzeGewichtEnde = 8.9;
+double KatzeGewichtStart = 8.0;
+double KatzeGewichtEnde = 8.9;
 
 #define UDPDEBUG 1
 #ifdef UDPDEBUG
@@ -35,23 +35,23 @@ uint32_t mTimeSeconds = 0;
 // HX711 circuit wiring
 const int LOADCELL_DOUT_PIN = D6; //A2;
 const int LOADCELL_SCK_PIN = D5; // A3;
-const float kalibrierung = -21600.F;
+const double kalibrierung = -21600.F;
 
 #define DATA_PIN D1 //22
 #define NUM_LEDS 3
 CRGB leds[NUM_LEDS];
 
-int counter=2000, ledcounter=0, ledjob=0, timecounter=0;
+int counter=2000, waagecounter=0, ledcounter=0, ledjob=0, timecounter=0;
 
 #define HOST_NAME Katze
 
 char logString[200];
-float Gewicht=0;
-float AltGewicht=0;
+double Gewicht=0;
+double AltGewicht=0;
 int Messungen=0;
 int TaraCounter = 0;
 
-float GewichtMittel[10];
+double GewichtMittel[10];
 int GewichtAnzahl=0;
 
 int LichtBad=0;
@@ -124,7 +124,7 @@ button4 = new DebounceEvent(D7, BUTTON_PUSHBUTTON | BUTTON_DEFAULT_HIGH | BUTTON
   scale.set_scale(kalibrierung); // (223.F);                      // this value is obtained by calibrating the scale with known weights; see the README for details
   scale.tare(20);                // reset the scale to 0
   Serial.println("begin");
-  UDBDebug("Timmit start");
+  UDBDebug("Timmi start");
   delay(500);
 }
 
@@ -247,11 +247,15 @@ void loop() {
           FastLED.show();
   }
 
-  float Gelesen=0;
+  double Gelesen=0;
 
- if ((counter >= 10000) ) {
+ if ((++waagecounter >= 1000) ) {
   // alle 1 sec
-    Gelesen = scale.get_units(10);
+  waagecounter = 0;
+  Gelesen = WaageAverage(10);
+
+    // Gelesen = scale.get_units(5);
+
     if ((Gelesen <= (AltGewicht + 0.1)) && (Gelesen >= (AltGewicht - 0.1)) ) {  // gleicher Wert erneut gelesen     
       if (!((Gelesen <= (Gewicht + 0.1)) && (Gelesen >= (Gewicht - 0.1)) )) {  // Wert noch nicht gesendet
               Gewicht = Gelesen;
@@ -264,18 +268,23 @@ void loop() {
 
      if ((Gelesen <= 2.0) && (Gelesen >= -4.8 ))    
      {
-      if (++TaraCounter > 1800) {
+      if (++TaraCounter > 200) {
         TaraCounter = 0;
-        scale.tare(20);  
-        Gelesen = scale.get_units(10);
-        SendeStatus(Gewicht, 3, Gelesen);
+        if ((Gelesen >= 0.1) || (Gelesen <= -0.1 ))   {
+          WaageTara();
+          double NeuGelesen = WaageAverage(5);
+          //SendeStatus(Gewicht, 3, Gelesen);
+          char message[100];
+          snprintf(message, 100, "Timmi Tara: %f nachher: %f", Gelesen, NeuGelesen);
+          UDBDebug(message);
+        }
        }
 
-    Messungen++;
+      Messungen++;
 
-      if (Messungen > 30) {
+      if (Messungen > 5) {
         // eine Minute
-        if (Gewicht > 5)
+        if (Gewicht > 8)
           SendeStatus(Gewicht, 0, Gelesen);
         Messungen = 0;
       }
@@ -287,8 +296,28 @@ void loop() {
 
 }
 
+void WaageTara() {
+  float sum = 0;
+  byte times = 20;
+	      for (byte i = 0; i < times; i++) {
+		      sum += scale.read();
+		      client.loop();
+          ArduinoOTA.handle();
+          delay(1);
+	      }
+	 scale.set_offset (sum / times);
+}
 
-
+double WaageAverage(byte times) {
+  double sum = 0;
+	      for (byte i = 0; i < times; i++) {
+		      sum += scale.get_units(1);
+		      client.loop();
+          ArduinoOTA.handle();
+          delay(1);
+	      }
+	 return (sum / times);
+}
 
 // #############################################################
 void WIFI_Connect()
@@ -322,19 +351,18 @@ void WIFI_Connect()
 
 void SendeStatus(float Gewicht, int warum, float Gelesen) {
 
-  float sende = roundf(Gewicht * 89) / 100;   // Waage * 0.89 zur Korrektur
-
+  double sende = roundf(Gewicht * 89) / 100;   // Waage * 0.89 zur Korrektur
+  
   if (Gewicht > 3) {
-    UDBDebug("SendeStatus Timmi "+String(Gewicht));
+    //UDBDebug("SendeStatus Timmi "+String(sende));  in MQTT send
     MQTT_Send("display/Gewicht", sende);
   }
   
   if ((sende > KatzeGewichtStart) && (sende < KatzeGewichtEnde)) {
-    UDBDebug("Timmi gewogen: "+String(sende));
-    sende = BerechneDurchschnitt(sende);
-    sende = roundf(sende * 100) / 100;
-    UDBDebug("Timmi Durchschnitt: "+String(sende));
-    MQTT_Send("HomeServer/Tiere/Timmi", sende);
+    double sendeavg = BerechneDurchschnitt(sende);
+    sendeavg = roundf(sendeavg * 100) / 100;
+    UDBDebug("SendeStatus Timmi gewogen: "+String(sende)+ "avg: "+String(sendeavg));
+    MQTT_Send("HomeServer/Tiere/Timmi", sendeavg);
   }  
 }
 
@@ -375,7 +403,8 @@ void SendeLicht(int licht) {
    FastLED.show();
 }
 
-float BerechneDurchschnitt(float neu) {
+double BerechneDurchschnitt(double neu) {
+
   if (GewichtAnzahl>9) {
     for (int i = 0; i<9; i++) {
       GewichtMittel[i] = GewichtMittel[i+1];
@@ -385,7 +414,7 @@ float BerechneDurchschnitt(float neu) {
 
   GewichtMittel[GewichtAnzahl++] = neu;
 
-  float mittel = 0;
+  double mittel = 0;
   for (int i = 0; i<GewichtAnzahl; i++) {
       mittel += GewichtMittel[i];
   }
@@ -454,6 +483,12 @@ void MQTT_Send(char const * topic, String value) {
 }
 
 void MQTT_Send(char const * topic, float value) {
+    char buffer[10];
+    snprintf(buffer, 10, "%f", value);
+    MQTT_Send(topic, buffer);
+}
+
+void MQTT_Send(char const * topic, double value) {
     char buffer[10];
     snprintf(buffer, 10, "%f", value);
     MQTT_Send(topic, buffer);
